@@ -32,6 +32,7 @@
             <li><button onclick="open_ajax();">open remote</button></li>
             <li><button onclick="prompt_info('see 6.Multi Format');">open local file</button></li>
             <li><button onclick="prompt_info('see 6.Multi Format');">save local file</button></li>
+            <li><button onclick="screen_shot();">screenshot</button></li>
         </ol>
         </ol>
         <div>2. Select &amp; Toggle</div>
@@ -39,12 +40,12 @@
             <li><button onclick="select_node();">select a node</button></li>
             <li><button onclick="prompt_info('please try click a node');">try click a node</button></li>
             <li><button onclick="show_selected();">get the selected</button></li>
-            <li><button onclick="toggle_node();">toggle node</button></li>
         </ol>
         <div>3. Edit</div>
         <ol type='A'>
             <li><button onclick="toggle_editable(this);">disable editable</button></li>
             <li><button onclick="add_node();">add a node</button></li>
+            <li><button onclick="add_image_node();">add a image node</button></li>
             <li><button onclick="modify_node();">modify node</button></li>
             <li><button onclick="prompt_info('please try double click a node');">try double click</button></li>
             <li><button onclick="move_node();">move a node</button></li>
@@ -52,7 +53,14 @@
             <li><button onclick="move_to_last();">move to last</button></li>
             <li><button onclick="remove_node();">remove node</button></li>
         </ol>
-        <div>4. Theme</div>
+        <div>4. Style</div>
+        <ol type='A'>
+            <li><button onclick="change_text_font();">change font</button></li>
+            <li><button onclick="change_text_color();">change color</button></li>
+            <li><button onclick="change_background_color();">change bg-color</button></li>
+            <li><button onclick="change_background_image();">change background</button></li>
+        </ol>
+        <div>5. Theme</div>
         <ol type='A'>
         <li>
         <select onchange="set_theme(this.value);">
@@ -75,12 +83,31 @@
         </select>
         </li>
         </ol>
-        <div>5. Adjusting</div>
+        <div>6. Adjusting</div>
         <ol type='A'>
             <li><button onclick="change_container();">resize container</button>
             <button onclick="resize_jsmind();">adusting</button></li>
+            <li>expand/collapse</li>
+            <ol>
+                <li><button class="sub" onclick="expand();">expand node</button></li>
+                <li><button class="sub" onclick="collapse();">collapse node</button></li>
+                <li><button class="sub" onclick="toggle();">toggle node</button></li>
+                <li><button class="sub" onclick="expand_to_level2();">expand to level 2</button></li>
+                <li><button class="sub" onclick="expand_to_level3();">expand to level 3</button></li>
+                <li><button class="sub" onclick="expand_all();">expand all</button></li>
+                <li><button class="sub" onclick="collapse_all();">collapse all</button></li>
+            </ol>
+            <li>zoom</li>
+
+            <button id="zoom-in-button" style="width:50px" onclick="zoomIn();">
+                In
+            </button>
+            <button id="zoom-out-button" style="width:50px" onclick="zoomOut();">
+                Out
+            </button>
         </ol>
-        <div>6. Multi Format</div>
+
+        <div>7. Multi Format</div>
         <ol type='A'>
             <li>node_tree(default)</li>
             <ol>
@@ -106,8 +133,14 @@
         </ol>
     </div>
     <div id="jsmind_container"></div>
+    <div style="display:none">
+      <input class="file" type="file" id="image-chooser" accept="image/*"/>
+    </div>
+
 </div>
 <script type="text/javascript" src="../js/jsmind.js"></script>
+<script type="text/javascript" src="../js/jsmind.draggable.js"></script>
+<script type="text/javascript" src="../js/jsmind.screenshot.js"></script>
 <script type="text/javascript">
     var _jm = null;
     function open_empty(){
@@ -133,10 +166,11 @@
                     {"id":"easy1","topic":"Easy to show"},
                     {"id":"easy2","topic":"Easy to edit"},
                     {"id":"easy3","topic":"Easy to store"},
-                    {"id":"easy4","topic":"Easy to embed"}
+                    {"id":"easy4","topic":"Easy to embed"},
+                    {"id":"other3","background-image":"ant.png", "width": "100", "height": "100"}
                 ]},
                 {"id":"open","topic":"Open Source","direction":"right","children":[
-                    {"id":"open1","topic":"on GitHub"},
+                    {"id":"open1","topic":"on GitHub", "background-color":"#eee", "foreground-color":"blue"},
                     {"id":"open2","topic":"BSD License"}
                 ]},
                 {"id":"powerful","topic":"Powerful","direction":"right","children":[
@@ -158,6 +192,10 @@
         jsMind.util.ajax.get(mind_url,function(mind){
             _jm.show(mind);
         });
+    }
+
+    function screen_shot(){
+        _jm.screenshot.shootDownload();
     }
 
     function show_data(){
@@ -205,13 +243,6 @@
         }
     }
 
-    function toggle_node(){
-        var selected_id = get_selected_nodeid();
-        if(!selected_id){prompt_info('please select a node first.');}
-
-        _jm.toggle_node(selected_id);
-    }
-
     function get_selected_nodeid(){
         var selected_node = _jm.get_selected_node();
         if(!!selected_node){
@@ -223,33 +254,67 @@
 
     function add_node(){
         var selected_node = _jm.get_selected_node(); // as parent of new node
-        if(!selected_node){prompt_info('please select a node first.');}
+        if(!selected_node){prompt_info('please select a node first.');return;}
 
         var nodeid = jsMind.util.uuid.newid();
         var topic = '* Node_'+nodeid.substr(0,5)+' *';
         var node = _jm.add_node(selected_node, nodeid, topic);
     }
 
+    var imageChooser = document.getElementById('image-chooser');
+
+    imageChooser.addEventListener('change', function (event) {
+        // Read file here.
+        var reader = new FileReader();
+        reader.onloadend = (function () {
+            var selected_node = _jm.get_selected_node();
+            var nodeid = jsMind.util.uuid.newid();
+            var topic = undefined;
+            var data = {
+                "background-image": reader.result,
+                "width": "100",
+                "height": "100"};
+            var node = _jm.add_node(selected_node, nodeid, topic, data);
+            //var node = _jm.add_image_node(selected_node, nodeid, reader.result, 100, 100);
+        //add_image_node:function(parent_node, nodeid, image, width, height, data, idx, direction, expanded){
+        });
+
+        var file = imageChooser.files[0];
+        if (file) {
+            reader.readAsDataURL(file);
+        };
+
+    }, false);
+
+    function add_image_node(){
+        var selected_node = _jm.get_selected_node(); // as parent of new node
+        if(!selected_node){
+            prompt_info('please select a node first.');
+            return;
+        }
+
+        imageChooser.focus();
+        imageChooser.click();
+    }
+
     function modify_node(){
         var selected_id = get_selected_nodeid();
-        if(!selected_id){prompt_info('please select a node first.');}
+        if(!selected_id){prompt_info('please select a node first.');return;}
 
         // modify the topic
         _jm.update_node(selected_id, '--- modified ---');
-        // or modify the topic and summary
-        //_jm.update_node(selected_id, '--- modified ---', 'modify summary at the same time');
     }
 
     function move_to_first(){
         var selected_id = get_selected_nodeid();
-        if(!selected_id){prompt_info('please select a node first.');}
+        if(!selected_id){prompt_info('please select a node first.');return;}
 
         _jm.move_node(selected_id,'_first_');
     }
 
     function move_to_last(){
         var selected_id = get_selected_nodeid();
-        if(!selected_id){prompt_info('please select a node first.');}
+        if(!selected_id){prompt_info('please select a node first.');return;}
 
         _jm.move_node(selected_id,'_last_');
     }
@@ -261,14 +326,61 @@
 
     function remove_node(){
         var selected_id = get_selected_nodeid();
-        if(!selected_id){prompt_info('please select a node first.');}
+        if(!selected_id){prompt_info('please select a node first.');return;}
 
         _jm.remove_node(selected_id);
+    }
+
+    function change_text_font(){
+        var selected_id = get_selected_nodeid();
+        if(!selected_id){prompt_info('please select a node first.');return;}
+
+        _jm.set_node_font_style(selected_id, 28);
+    }
+
+    function change_text_color(){
+        var selected_id = get_selected_nodeid();
+        if(!selected_id){prompt_info('please select a node first.');return;}
+
+        _jm.set_node_color(selected_id, null, '#000');
+    }
+
+    function change_background_color(){
+        var selected_id = get_selected_nodeid();
+        if(!selected_id){prompt_info('please select a node first.');return;}
+
+        _jm.set_node_color(selected_id, '#eee', null);
+    }
+
+    function change_background_image(){
+        var selected_id = get_selected_nodeid();
+        if(!selected_id){prompt_info('please select a node first.');return;}
+
+        _jm.set_node_background_image(selected_id, 'ant.png', 100, 100);
     }
 
     function set_theme(theme_name){
         _jm.set_theme(theme_name);
     }
+
+    var zoomInButton = document.getElementById("zoom-in-button");
+    var zoomOutButton = document.getElementById("zoom-out-button");
+
+    function zoomIn() {
+        if (_jm.view.zoomIn()) {
+            zoomOutButton.disabled = false;
+        } else {
+            zoomInButton.disabled = true;
+        };
+    };
+
+    function zoomOut() {
+        if (_jm.view.zoomOut()) {
+            zoomInButton.disabled = false;
+        } else {
+            zoomOutButton.disabled = true;
+        };
+    };
 
     function toggle_editable(btn){
         var editable = _jm.get_editable();
@@ -291,6 +403,44 @@
     function resize_jsmind(){
         _jm.resize();
     }
+
+    function expand(){
+        var selected_id = get_selected_nodeid();
+        if(!selected_id){prompt_info('please select a node first.');return;}
+
+        _jm.expand_node(selected_id);
+    }
+
+    function collapse(){
+        var selected_id = get_selected_nodeid();
+        if(!selected_id){prompt_info('please select a node first.');return;}
+
+        _jm.collapse_node(selected_id);
+    }
+
+    function toggle(){
+        var selected_id = get_selected_nodeid();
+        if(!selected_id){prompt_info('please select a node first.');return;}
+
+        _jm.toggle_node(selected_id);
+    }
+
+    function expand_all(){
+        _jm.expand_all();
+    }
+
+    function expand_to_level2(){
+        _jm.expand_to_depth(2);
+    }
+
+    function expand_to_level3(){
+        _jm.expand_to_depth(3);
+    }
+
+    function collapse_all(){
+        _jm.collapse_all();
+    }
+
 
     function get_nodearray_data(){
         var mind_data = _jm.get_data('node_array');
